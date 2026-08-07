@@ -82,53 +82,57 @@ Silently ignored below the threshold — no error is returned.
 
 ## Interpreting `--mode cache`
 
-- `read_to_write_ratio` — the headline health metric. High is good: prefixes are being reused, not
-  rebuilt. Below ~5 suggests fragmented sessions or frequent invalidation.
-- `avoidable_total_usd` — the number to lead with. Sums the three avoidable drop causes plus the
-  un-amortized 1h premium. Excludes compaction.
-- `cache_drops.*.pct_of_total_spend` — under ~5% is normal friction; above ~10% is behavioural.
-- `totals.ttl_detection` — per-lane TTL derived from observed writes, not assumed.
+Findings arrive in `report["findings"]`, already ranked by dollars. The ones this mode produces are
+`ttl_expiry`, `model_switch`, `invalidation_no_gap` and `unamortized_1h_writes`.
+
+- `summary.measured_waste_usd` — the number to lead with. Arithmetic, not opinion.
+- `totals.read_to_write_ratio` — headline health. High is good: prefixes are being reused rather
+  than rebuilt. Below ~5 suggests fragmented sessions or frequent invalidation.
+- `totals.ttl_detection` — per-lane cache lifetime derived from observed writes, never assumed.
+- Each finding's `events` carry `avoidable_usd`, and an `explain` string already written for a
+  first-time reader.
 
 ### Cause attribution
 
-The detector fires on a **cache drop**: a turn writing a material prefix when the previous turn had
-an established one (≥20k tokens) and this turn reads less than half of it. Cause is then assigned in
-priority order:
+A finding fires on a **cache drop**: a turn writing a material prefix when the previous turn had an
+established one (>=20k tokens) and this turn reads back less than half of it. `signals.cache_drops`
+assigns the cause once, in priority order:
 
-1. `compaction` — a `compact_boundary` fell between the two turns. Legitimate; excluded from waste.
+1. `compaction` — a compact boundary fell between the two turns. Legitimate; not reported as waste.
 2. `ttl_expiry` — the gap exceeded that lane's observed TTL. Provable.
 3. `model_switch` — the model changed. Provable.
 4. `invalidation_no_gap` — none of the above: warm window, same model, no compaction.
+
+Bucket 4 is an **inference about the trigger, though the cost is measured exactly**. The logs do not
+record tool-definition or system-prompt changes, so the analyzer can only say the prefix died for a
+reason it cannot see. Present it that way. Likely triggers, roughly by frequency: a session resume,
+an MCP server connecting mid-session, a CLAUDE.md edit, a settings or plugin change altering the
+tool list.
+
+Drops at very short gaps (<1 min) are the strongest signal of the reported — but not officially
+documented — behaviour where resuming a session invalidates the cache outright.
 
 ### Who was idle: `subcause` on `ttl_expiry`
 
 The gap is split using human prompt timestamps. `type: user` entries with string or `text`-block
 content are real prompts; entries carrying `tool_result` blocks are the machine loop and are ignored.
 
-- `human_idle_minutes` — previous response → the human prompt that triggered this turn.
-- `machine_busy_minutes` — that prompt → the request going out.
+- `human_idle_minutes` — previous response to the human prompt that triggered this turn.
+- `machine_busy_minutes` — that prompt to the request going out.
 
 | `subcause` | Meaning | Prescription |
 |---|---|---|
 | `human_away` | A human prompt arrived after a gap longer than the TTL | `/clear` before breaks |
-| `no_human_input` | No human prompt in the gap at all | `/clear` is useless here — see below |
+| `no_human_input` | No human prompt in the gap at all | `/clear` is useless here |
 | `combined` | Both contributed | Address whichever dominates |
 
-`no_human_input` is deliberately vague because the logs cannot disambiguate it. It covers a long tool
-execution, a session sitting on an unanswered **permission approval**, and a sleeping machine.
-Permission approvals are not logged as user messages, so a prompt left unanswered over lunch looks
-identical to a long-running build. Say this plainly rather than guessing which it was.
+`no_human_input` is deliberately vague because the logs cannot disambiguate it: a long tool
+execution, a session sitting on an unanswered **permission approval**, and a sleeping machine all
+look identical. Approvals are not logged as user messages, so a prompt left unanswered over lunch is
+indistinguishable from a long-running build. Say this plainly rather than guessing.
 
-This distinction changes the advice completely, so never collapse the two. Telling someone to take
-shorter breaks when their agent was grinding for 76 minutes unattended is wrong and will read as such.
-
-Bucket 4 is an **inference, not a proof**. The logs do not record tool-definition or system-prompt
-changes, so the analyzer can only say the prefix died for a reason it cannot see. Present it that
-way. Likely triggers, in rough order of frequency: a session resume, an MCP server connecting
-mid-session, a `CLAUDE.md` edit, a settings or plugin change altering the tool list.
-
-Note that drops at *very* short gaps (<1 min) are the strongest signal of the reported — but not
-officially documented — behaviour where resuming a session invalidates the cache outright.
+Never collapse the two. Telling someone to take shorter breaks when their agent was grinding
+unattended for 76 minutes is wrong and will read as such.
 
 ## What the docs do NOT say
 
