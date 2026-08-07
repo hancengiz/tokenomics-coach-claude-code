@@ -52,15 +52,29 @@ Override the path with `--html <path>` or skip it with `--no-html`.
 
 ## Sample output
 
-```
-14 days · $69.73 total · $9.88 avoidable (14%)
+The action list, ranked by what each change is worth:
 
-1. $4.96  TTL expiry — 3 drops, 522k tokens re-written
-          Worst: session 0ac0d9f6, idle 76min on a 293k prefix → $2.70 in one keystroke
-2. $3.92  Un-amortized 1h writes — 65 writes never reached 2 reads
-3. $0.52  Model switch — 1 drop mid-session at a 1.1min gap
-4. $0.48  Invalidation with no gap — 2 drops at <20s idle
 ```
+30 days · $94.38 total · $24.93 avoidable (26%)
+
+1. $17.10  Run execution on Sonnet
+           279 Opus turns outside plan mode cost $44.80; the same tokens on
+           Sonnet 4.6 would be $26.88, net of the $0.82 switch tax.
+2.  $4.02  Consolidate short sessions
+           70 one-hour cache writes never reached the 2 reads needed to break even.
+3.  $2.70  Split very long unattended runs
+           76 min of machine time on a 293k prefix, no human prompt in the gap.
+           A tool loop, an unanswered permission prompt, or a sleeping machine.
+4.  $2.26  Clear before long breaks
+           2 re-caches after genuinely being away — worst was 1,289 min.
+5.  $0.85  Change config between sessions
+           4 cache collapses inside the TTL window; likely CLAUDE.md or MCP change.
+6.      —  Compact long sessions at task boundaries
+           4 sessions over 150k context with zero compaction, totalling $62.44.
+```
+
+Note items 3 and 4: both are TTL expiry, but only one is a break you took. Collapsing them would
+produce the wrong advice for the more expensive of the two.
 
 ## Why the cache is the whole story
 
