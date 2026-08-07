@@ -32,7 +32,23 @@ time, and those drops are invisible to gap-based analysis.
 - **Never-compacted large sessions** — a 300k-token context re-read every turn is a per-turn tax
   that grows with the thread.
 - **Planning vs execution model spend** — split by `permissionMode`, so you can answer "am I paying
-  Opus rates to write files?"
+  Opus rates to write files?" Includes an `opusplan` estimate: what execution-phase Opus turns would
+  have cost on Sonnet, net of the re-cache tax that toggling models actually incurred.
+
+## HTML report
+
+Every run writes a self-contained HTML report to `~/tokenomics-report-<date>.html`:
+
+- Headline cards — total spend, avoidable spend, share wasted, read/write ratio
+- A dollar-ranked **action list** — what to change, worth how much
+- Daily stacked-bar spend chart, split into cache reads / cache writes / output
+- Cache drops by cause, and the worst individual events
+- Sortable per-session drill-down
+- Planning vs execution split with the `opusplan` estimate
+
+It is rendered **by `analyze.py`, not by the model** — so it costs zero tokens, never drifts between
+runs, and works when you run the script directly. Single file, no external requests, theme-aware.
+Override the path with `--html <path>` or skip it with `--no-html`.
 
 ## Sample output
 

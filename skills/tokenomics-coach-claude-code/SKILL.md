@@ -45,6 +45,21 @@ Add `--project ~/code/my-app` to scope. Always pass `--pretty`. Rates live in `s
 python3 "$SKILL_DIR/scripts/analyze.py" --mode all --days 30 --pretty
 ```
 
+## The HTML report is automatic
+
+Every run writes a self-contained HTML report to `~/tokenomics-report-<date>.html` and returns the
+path as `html_report` in the JSON. **You do not generate this** — the script renders it
+deterministically, so it costs no tokens and is byte-identical run to run. Never hand-write HTML for
+this skill.
+
+- Override the location with `--html <path>`; suppress with `--no-html`.
+- The report always contains every section, even when `--mode` asked for one.
+- Always tell the user the path in your reply. Do not paste the report's contents back to them.
+
+It contains: headline cards, a dollar-ranked action list, a daily stacked-bar spend chart
+(reads/writes/output), cache drops by cause, worst individual events, most expensive sessions, and
+the planning-vs-execution split with the `opusplan` estimate.
+
 ## Cache drops — the core detector
 
 `cache.cache_drops` finds every turn that **rebuilt a prefix which was warm on the previous turn**,
@@ -138,7 +153,8 @@ recommending it — if the user toggles constantly on a large context, the trade
 
 ## Reporting shape
 
-Open with the bottom line, then the ranked findings:
+Open with the bottom line, then the ranked findings, then the report path. Keep the terminal reply
+short — the detail lives in the HTML.
 
 ```
 14 days · $69.73 total · $9.88 avoidable (14%)
@@ -148,6 +164,8 @@ Open with the bottom line, then the ranked findings:
 2. $3.92  Un-amortized 1h writes — 65 writes never reached 2 reads
 3. $0.52  Model switch — 1 drop mid-session at a 1.1min gap
 4. $0.48  Invalidation with no gap — 2 drops at <20s idle; likely CLAUDE.md/MCP change
+
+Full report: ~/tokenomics-report-2026-08-07.html
 ```
 
 Close with at most three concrete behaviour changes, each tied to a dollar figure.

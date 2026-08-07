@@ -4,3 +4,4 @@ __pycache__/
 .cache/
 *.tmp.json
 tokenomics-report*.md
+tokenomics-report*.html
