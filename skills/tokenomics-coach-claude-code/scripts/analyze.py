@@ -577,6 +577,13 @@ def analyze_models(data: dict, pricing: dict) -> dict:
         )
     switch_tax = sum(s["recache_cost_usd"] for s in switches)
 
+    # Does the user actually use plan mode? If not, "adopt opusplan" is the wrong
+    # framing: there is no planning phase to move Opus into, so the estimate is
+    # really "stop using Opus", which is a much larger decision.
+    plan_reqs = sum(s["requests"] for s in by_mode.get("plan", {}).values())
+    all_reqs = sum(v["requests"] for v in by_model.values())
+    plan_share = round(plan_reqs / max(all_reqs, 1) * 100, 1)
+
     return {
         "by_model": dict(by_model),
         "by_permission_mode": modes,
@@ -587,10 +594,17 @@ def analyze_models(data: dict, pricing: dict) -> dict:
             "gross_saving_usd": round(exec_opus_actual - exec_opus_on_sonnet, 2),
             "observed_switch_tax_usd": round(switch_tax, 2),
             "net_saving_usd": round(exec_opus_actual - exec_opus_on_sonnet - switch_tax, 2),
+            "plan_mode_requests": plan_reqs,
+            "plan_mode_share_pct": plan_share,
+            "opusplan_applicable": plan_share >= 5.0,
             "note": "Rate-difference estimate for non-plan-mode Opus turns if run on "
                     "Sonnet 4.6, less the re-cache cost already observed from model "
                     "switching. Assumes equal token counts, which is optimistic: "
-                    "weaker models may iterate more.",
+                    "weaker models may iterate more."
+                    + ("" if plan_share >= 5.0 else
+                       " NOTE: plan mode is barely used, so this is NOT the opusplan "
+                       "trade — there is no planning phase to keep on Opus. Read it as "
+                       "'what if Opus work ran on Sonnet', a larger quality decision."),
         },
         "note_plan_vs_execute": "permissionMode 'plan' marks planning turns; "
                                 "'default'/'auto' are execution. The opusplan alias "
@@ -696,11 +710,22 @@ def _actions(out: dict) -> list[dict]:
 
     op = models.get("opusplan_opportunity", {})
     if op.get("net_saving_usd", 0) > 0:
-        acts.append({"usd": op["net_saving_usd"], "title": "Run execution on Sonnet",
+        if op.get("opusplan_applicable"):
+            title = "Run execution on Sonnet (opusplan)"
+            tail = ("Plan mode is already in use, so the opusplan alias would keep Opus for "
+                    "planning and hand execution to Sonnet.")
+        else:
+            title = "Reconsider Opus for execution work"
+            tail = (f"Plan mode is only {op.get('plan_mode_share_pct', 0)}% of requests, so this "
+                    f"is NOT the opusplan trade — there is no planning phase to keep on Opus. "
+                    f"Read it as 'what if this Opus work ran on Sonnet', which is a quality "
+                    f"decision, not just a pricing one. Adopting opusplan properly would mean "
+                    f"starting to use plan mode.")
+        acts.append({"usd": op["net_saving_usd"], "title": title,
                      "detail": f"{op['execution_opus_requests']} Opus turns outside plan mode cost "
                                f"${op['execution_opus_cost_usd']}; the same tokens on Sonnet 4.6 "
-                               f"would be ${op['same_work_on_sonnet_usd']}. Net of the "
-                               f"${op['observed_switch_tax_usd']} switch tax. Consider opusplan."})
+                               f"would be ${op['same_work_on_sonnet_usd']}, net of the "
+                               f"${op['observed_switch_tax_usd']} switch tax. {tail}"})
 
     b = sess.get("never_compacted_large_sessions", {})
     if b.get("count", 0) > 0:

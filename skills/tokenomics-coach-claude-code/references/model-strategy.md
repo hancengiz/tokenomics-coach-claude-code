@@ -18,6 +18,25 @@ Official guidance:
   Sonnet 4.6 $3/$15 per MTok — and the gap widens on output-heavy execution).
 - Haiku suits simple subagent tasks and lookups.
 
+## Check plan mode is actually used first
+
+`opusplan_opportunity.plan_mode_share_pct` reports what fraction of requests ran in plan mode, and
+`opusplan_applicable` is false below 5%.
+
+**Opus does not cost less in plan mode.** The rate is identical — $5/$25 either way. The entire
+argument rests on *volume*: execution burns far more tokens than planning, and Opus's advantage is
+narrowest there. So you pay the premium rate on the small phase and the cheap rate on the large one.
+
+If plan mode is near zero, "adopt opusplan" is the wrong recommendation and you must say so. The
+saving estimate covers *all* Opus turns, so it is really "what if Opus work ran on Sonnet" — a
+quality decision, not a routing tweak. Adopting opusplan properly would mean the user *starts*
+planning, which raises Opus usage in one phase while cutting it in the other. Do not present that as
+a pure saving.
+
+Also check *where* the Opus spend sits. Opus concentrated in `auto` permission mode means unattended
+execution — the strongest case for the switch. Opus in `default` alongside heavy human interaction is
+weaker, since that is where reasoning quality is most visible.
+
 ## The catch
 
 Each plan↔execute toggle is a **model switch**, and a model switch invalidates the cached prefix.
