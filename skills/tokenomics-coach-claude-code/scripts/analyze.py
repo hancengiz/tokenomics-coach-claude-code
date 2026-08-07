@@ -10,18 +10,21 @@ that JSON, so a report can be annotated and re-rendered without touching logs.
   analyze.py --days 30                      # analyse, write JSON + HTML
   analyze.py --mode cache --project ~/app   # one area, one project
   analyze.py --render report.json           # re-render HTML after adding notes
+  analyze.py --render report.json --anonymize   # shareable copy, names removed
 
 Architecture:
-  pricing.py   rates and per-request cost
-  collect.py   JSONL -> Dataset (parsing only, no judgement)
-  signals.py   shared derived facts: cache drops, sessions, daily, totals
-  rules/       one file per check; add a file to add a check
-  report.py    the JSON report model
-  html.py      report JSON -> self-contained page
+  pricing.py    rates and per-request cost
+  collect.py    JSONL -> Dataset (parsing only, no judgement)
+  signals.py    shared derived facts: cache drops, sessions, daily, totals
+  rules/        one file per check; add a file to add a check
+  report.py     the JSON report model
+  anonymize.py  report JSON -> shareable report JSON
+  html.py       report JSON -> self-contained page
 """
 
 from __future__ import annotations
 import argparse
+import json
 import os
 import sys
 from datetime import datetime
@@ -29,6 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from tokenomics import anonymize as anon_mod           # noqa: E402
 from tokenomics import collect as collect_mod          # noqa: E402
 from tokenomics import html as html_mod                # noqa: E402
 from tokenomics import report as report_mod            # noqa: E402
@@ -48,6 +52,30 @@ def default_paths(explicit_html: str | None, explicit_json: str | None):
     else:
         js = html.with_suffix(".json")   # always sits beside the page
     return html, js
+
+
+def write_anonymized(report: dict, stem: Path, want_html: bool) -> None:
+    """Write the shareable pair beside `stem`, plus a private legend.
+
+    The legend maps "Session 3" back to the real chat, and is deliberately a
+    separate file: it stays on this machine while the -anonymized pair is what
+    gets shared.
+    """
+    anon, legend = anon_mod.anonymize(report)
+    base = stem.with_name(stem.stem + "-anonymized")
+    json_path = base.with_suffix(".json")
+    legend_path = stem.with_name(stem.stem + "-legend.json")
+    try:
+        report_mod.save(anon, json_path)
+        legend_path.write_text(json.dumps(legend, indent=2), encoding="utf-8")
+        print(f"anonymized json: {json_path}")
+        if want_html:
+            html_path = base.with_suffix(".html")
+            html_mod.write(anon, html_path)
+            print(f"anonymized html: {html_path}")
+        print(f"legend (keep private, do not share): {legend_path}")
+    except OSError as e:
+        print(f"warning: could not write the anonymized copy ({e})", file=sys.stderr)
 
 
 def main() -> int:
@@ -70,6 +98,10 @@ def main() -> int:
     ap.add_argument("--render", type=str, default=None, metavar="REPORT.json",
                     help="Re-render HTML from an existing report JSON and exit. "
                          "Use after adding notes to it.")
+    ap.add_argument("--anonymize", action="store_true",
+                    help="Also write a shareable copy (-anonymized.json/.html) with "
+                         "chat titles, directories and project names replaced by "
+                         "placeholders, plus a private legend mapping them back.")
     ap.add_argument("--pretty", action="store_true",
                     help="Pretty-print the report to stdout")
     args = ap.parse_args()
@@ -84,8 +116,11 @@ def main() -> int:
             return 1
         out = Path(os.path.expanduser(args.html)) if args.html \
             else src.with_suffix(".html")
-        html_mod.write(report, out)
-        print(f"rendered {out}")
+        if not args.no_html:
+            html_mod.write(report, out)
+            print(f"rendered {out}")
+        if args.anonymize:
+            write_anonymized(report, src, not args.no_html)
         return 0
 
     pricing = load_pricing()
@@ -140,6 +175,10 @@ def main() -> int:
         print(f"json: {json_path}")
     if html_path:
         print(f"html: {html_path}")
+    if args.anonymize:
+        stem = json_path or html_path
+        if stem:
+            write_anonymized(report, stem, not args.no_html)
 
     if args.pretty:
         import json as _json

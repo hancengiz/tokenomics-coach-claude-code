@@ -148,6 +148,29 @@ python3 scripts/analyze.py --render ~/tokenomics-report-2026-08-07.json
 Notes appear in the page clearly marked as commentary. This is how you record things the logs cannot
 know: *"that overnight run was deliberate"*, *"we're staying on Opus for this client"*.
 
+### Sharing a report
+
+The report names your chats and your directories, so it is not safe to forward as-is. Add
+`--anonymize` for a copy that is:
+
+```bash
+python3 scripts/analyze.py --render ~/tokenomics-report-2026-08-07.json --anonymize
+```
+
+Chat titles become `Session 3`, working directories `~/projects/project-2`, session ids `sess0003` —
+consistently, so the same placeholder means the same session on every table and the page still reads
+as one story. Costs, token counts, timings, dates and model names are untouched; strip those and
+there is nothing left to discuss. Your notes are scrubbed too: real titles, paths, your home
+directory and e-mail addresses are substituted wherever they appear in prose.
+
+Three files come out. `…-anonymized.json` and `…-anonymized.html` are the shareable pair, and the
+page carries a banner saying so. `…-legend.json` maps the placeholders back to the real thing —
+**that one stays on your machine.**
+
+The skill offers this automatically once it has reported its findings. What it cannot catch is
+something *you* named in a note that the logs never recorded — a client, an unreleased product — so
+skim the copy before sending it.
+
 ## Extending it
 
 One rule per file. Each reads a shared read-only context and returns a finding or nothing; rules
@@ -163,6 +186,7 @@ scripts/
     ├── collect.py          JSONL → Dataset (parsing only, no judgement)
     ├── signals.py          shared facts: cache drops, sessions, daily, totals
     ├── report.py           the JSON report model
+    ├── anonymize.py        report JSON → shareable report JSON
     ├── html.py             report JSON → self-contained page
     ├── theme.py            stylesheet
     └── rules/
@@ -190,8 +214,9 @@ npx skills-ref validate ./skills/tokenomics-coach-claude-code
 ## Privacy
 
 Local only. The report includes project paths, Claude's own chat titles, and 8-character session ids;
-it never includes your code or prompt text. If you intend to share a report, check those titles first
-— they are generated from your conversations.
+it never includes your code or prompt text. Those titles are generated from your conversations, so to
+share a report, produce an anonymized copy with `--anonymize` (see
+[Sharing a report](#sharing-a-report)) rather than sending the original.
 
 ## Pricing data
 

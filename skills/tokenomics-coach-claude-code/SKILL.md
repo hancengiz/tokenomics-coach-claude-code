@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Python 3.9+ and Claude Code session logs in ~/.claude/projects
 allowed-tools: Read Write Bash(python3:*) Bash(ls:*) Bash(find:*) Bash(cat:*) AskUserQuestion
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   author: cengizhan
 ---
 
@@ -78,6 +78,36 @@ python3 "$SKILL_DIR/scripts/analyze.py" --render ~/tokenomics-report-<date>.json
 Use this when the user gives context the logs cannot know — "that long run was a deliberate overnight
 scan", "we're staying on Opus for this client". Notes render clearly marked as commentary.
 
+## Step last — offer a shareable copy
+
+The report names their chats and directories, so it is not safe to forward as-is. **After you have
+reported the findings** (and after any notes have been added — anonymise last, so the copy includes
+them), ask with `AskUserQuestion`:
+
+> Want a shareable copy of this report with names removed?
+> - **Yes, anonymized copy** — chat titles, paths and project names become placeholders
+> - **No, keep it local** — the report stays as it is
+
+Ask once. If they decline, drop it. If they accept:
+
+```bash
+python3 "$SKILL_DIR/scripts/analyze.py" --render ~/tokenomics-report-<date>.json --anonymize
+```
+
+That re-reads nothing and writes three files:
+
+- `…-anonymized.json` and `…-anonymized.html` — **safe to share.** Chat titles become "Session 3",
+  working directories "~/projects/project-2", ids "sess0003". The same placeholder means the same
+  session throughout, so the page still reads as one story. Costs, token counts, timings, dates and
+  model names are unchanged — the report would say nothing without them.
+- `…-legend.json` — maps the placeholders back. **Private.** Say so when you give them the path, and
+  never send it anywhere.
+
+The scrub also covers notes: real titles, paths, the home directory and e-mail addresses are
+substituted wherever they appear in free text. It cannot know about something a note names that the
+logs never recorded — a client name, an unreleased product — so tell the user to skim the copy before
+sending it if they wrote notes of their own.
+
 ## Reading the findings
 
 `findings` is a list, already sorted by dollar value. Each has `id`, `title`, `usd`, `confidence`,
@@ -115,7 +145,8 @@ summarise it, but do not contradict it.
 7. **Don't coach prompt wording.** Out of scope. Redirect to cost impact if it comes up.
 8. **Check `pricing.json` freshness** and warn if its `version` is more than ~90 days old.
 9. **Privacy.** The report already limits itself to titles, paths and 8-char session ids. Never quote
-   the user's code or prompt text beyond what the script emits.
+   the user's code or prompt text beyond what the script emits. Anything leaving their machine goes
+   through `--anonymize` — never hand-redact a report yourself.
 
 ## Reporting shape
 

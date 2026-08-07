@@ -40,6 +40,10 @@ border:1px solid var(--line);color:var(--muted);text-transform:uppercase;letter-
 padding:10px 14px;margin:12px 0 0;font-size:14px}
 .note .lbl{color:var(--note);font-weight:600;font-size:11.5px;text-transform:uppercase;
 letter-spacing:.06em;display:block;margin-bottom:3px}
+.anon{background:var(--noteBg);border:1px dashed var(--note);border-radius:10px;
+padding:10px 14px;margin:0 0 18px;font-size:13.5px;max-width:78ch}
+.anon .lbl{color:var(--note);font-weight:600;font-size:11.5px;text-transform:uppercase;
+letter-spacing:.06em;display:block;margin-bottom:3px}
 ol.acts{list-style:none;counter-reset:a;padding:0;margin:0}
 ol.acts li{counter-increment:a;border-bottom:1px solid var(--line);padding:11px 0}
 ol.acts li:last-child{border-bottom:0}

@@ -144,6 +144,13 @@ def render(report: dict) -> str:
     ttl = ", ".join(f"{v} {k}" for k, v in sorted(
         (totals.get("ttl_detection") or {}).items())) or "n/a"
 
+    banner = ("<div class='anon'><span class='lbl'>Anonymized copy</span>"
+              "Chat titles, working directories and project names have been replaced "
+              "with placeholders such as “Session 3” and “project-2”. The same "
+              "placeholder always means the same thing throughout the page. Costs, "
+              "token counts, timings, dates and model names are unchanged.</div>"
+              if report.get("anonymized") else "")
+
     return f"""<title>Tokenomics Report — {meta['days']}d</title>
 <style>{CSS}</style>
 <div class="wrap">
@@ -151,7 +158,7 @@ def render(report: dict) -> str:
 <p class="sub">Last {meta['days']} days · {meta['files_scanned']} log files ·
 {meta['unique_requests']:,} unique requests ({meta['duplicate_entries']:,} duplicates
 removed) · generated {esc(report.get('generated_at', ''))}</p>
-
+{banner}
 <div class="cards">{cards_html}</div>
 {_notes(report.get('notes'), 'Analyst note')}
 
