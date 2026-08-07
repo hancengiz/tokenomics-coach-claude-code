@@ -15,8 +15,12 @@ Find money the user is burning on the **prompt cache**, not on prompt wording. E
 make must come from `scripts/analyze.py` output — never estimate, never read raw `.jsonl`.
 
 **Give hard verdicts with dollar figures.** Name the session, state the avoidable cost, state what
-should have happened instead. "Session 0ac0d9f6 burned $2.70 resuming after a 76-minute break —
-that should have been `/clear` and a fresh session." Do not hedge into generic advice.
+should have happened instead. "Session f3a83bb5 burned $1.40 resuming a 146k-token context after
+21 hours away — that should have been `/clear` and a fresh session."
+
+But make the verdict fit the evidence. The same $2.70 re-cache means opposite things depending on
+`subcause`: if no human prompt fell in the gap, the user was not on a break and telling them to take
+shorter ones is simply wrong. Check before you prescribe. Hard verdicts, not hasty ones.
 
 ## Step 0 — Locate the script
 
@@ -168,16 +172,20 @@ Open with the bottom line, then the ranked findings, then the report path. Keep 
 short — the detail lives in the HTML.
 
 ```
-14 days · $69.73 total · $9.88 avoidable (14%)
+30 days · $99.25 total
+  $10.36 cache waste (measured) + $18.01 model savings (estimated) = $28.37 (28.6%)
 
-1. $4.96  TTL expiry — 3 drops, 522k tokens re-written
-          Worst: 0ac0d9f6 (visa-…-harness) idle 76min on a 293k prefix → $2.70
-2. $3.92  Un-amortized 1h writes — 65 writes never reached 2 reads
-3. $0.52  Model switch — 1 drop mid-session at a 1.1min gap
-4. $0.48  Invalidation with no gap — 2 drops at <20s idle; likely CLAUDE.md/MCP change
+1. $18.01  Run execution on Sonnet — 279 Opus turns outside plan mode, net of switch tax
+2.  $4.02  Consolidate short sessions — 70 1h writes never reached 2 reads
+3.  $2.70  Split long unattended runs — 76min machine time, no human prompt in the gap
+4.  $2.26  Clear before long breaks — 2 re-caches after genuinely being away
+5.  $0.85  Change config between sessions — 4 in-window collapses
 
 Full report: ~/tokenomics-report-2026-08-07.html
 ```
+
+Note items 3 and 4 are both `ttl_expiry` but split by `subcause`, because only one is a break the
+user took. Never collapse them.
 
 Close with at most three concrete behaviour changes, each tied to a dollar figure.
 
