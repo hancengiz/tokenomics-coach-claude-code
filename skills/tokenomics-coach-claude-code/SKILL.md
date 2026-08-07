@@ -150,12 +150,17 @@ recommending it — if the user toggles constantly on a large context, the trade
 
 1. **Script only.** Never `Read` a `.jsonl`. Never estimate a cost you did not compute.
 2. **Dollars, then tokens.** Lead every finding with the avoidable USD figure.
-3. **Name the session and project.** Verdicts are about specific sessions, not habits in general.
-4. **Rank by cost.** A 1.2M-token event that cost $0.06 is not the headline.
-5. **Progressive disclosure.** Read only the `references/*.md` for the active mode.
-6. **Don't coach prompt wording.** Out of scope. Redirect to cost impact if it comes up.
-7. **Cite pricing from `scripts/pricing.json`**, and warn if its `version` is more than ~90 days old.
-8. **Privacy.** Project directory names and 8-char session prefixes only; never quote user content.
+3. **Never merge measured and estimated savings into one number.** Use `summary`:
+   `cache_waste_usd` is *measured* — the exact delta between a rebuild and a cache read.
+   `model_saving_usd` is *estimated* — the same tokens repriced on a cheaper model, which assumes
+   the cheaper model would not iterate more. Quote `total_opportunity_usd` only alongside both
+   components and their confidence labels. Saying "$28 avoidable" unqualified is wrong.
+4. **Name the session and project.** Verdicts are about specific sessions, not habits in general.
+5. **Rank by cost.** A 1.2M-token event that cost $0.06 is not the headline.
+6. **Progressive disclosure.** Read only the `references/*.md` for the active mode.
+7. **Don't coach prompt wording.** Out of scope. Redirect to cost impact if it comes up.
+8. **Cite pricing from `scripts/pricing.json`**, and warn if its `version` is more than ~90 days old.
+9. **Privacy.** Project directory names and 8-char session prefixes only; never quote user content.
 
 ## Reporting shape
 

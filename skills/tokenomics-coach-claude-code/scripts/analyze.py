@@ -633,6 +633,28 @@ def analyze_daily(data: dict) -> list[dict]:
 # Deterministic HTML report
 # ---------------------------------------------------------------------------
 
+def summarize(out: dict) -> dict:
+    """The two headline figures, kept distinct because they differ in confidence.
+
+    Cache waste is measured: the exact delta between a rebuild and a cache read.
+    Model saving is an estimate: identical token counts repriced on a cheaper
+    model. Never add them together without saying which is which.
+    """
+    total = out.get("cache", {}).get("totals", {}).get("total_cost_usd", 0)
+    waste = out.get("cache", {}).get("avoidable_total_usd", 0)
+    saving = max(0.0, out.get("models", {}).get("opusplan_opportunity", {})
+                 .get("net_saving_usd", 0) or 0)
+    return {
+        "total_spend_usd": round(total, 2),
+        "cache_waste_usd": round(waste, 2),
+        "cache_waste_confidence": "measured",
+        "model_saving_usd": round(saving, 2),
+        "model_saving_confidence": "estimated (assumes equal token counts)",
+        "total_opportunity_usd": round(waste + saving, 2),
+        "pct_of_spend": round((waste + saving) / total * 100, 1) if total else 0,
+    }
+
+
 def _actions(out: dict) -> list[dict]:
     """Prioritized, dollar-weighted behaviour changes derived from the findings."""
     acts = []
@@ -830,14 +852,18 @@ def render_html(out: dict, path: Path) -> None:
     acts = _actions(out)
 
     total = totals.get("total_cost_usd", 0)
-    avoid = cache.get("avoidable_total_usd", 0)
-    pct = round(avoid / total * 100, 1) if total else 0
+    cache_waste = cache.get("avoidable_total_usd", 0)
+    model_saving = max(0.0, models.get("opusplan_opportunity", {})
+                       .get("net_saving_usd", 0) or 0)
+    opportunity = cache_waste + model_saving
+    pct = round(opportunity / total * 100, 1) if total else 0
     gen = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     cards = [("Window", f"{meta['days']} days", False),
              ("Total spend", f"${total:,.2f}", False),
-             ("Avoidable", f"${avoid:,.2f}", True),
-             ("Share wasted", f"{pct}%", True),
+             ("Cache waste", f"${cache_waste:,.2f}", True),
+             ("Model savings", f"${model_saving:,.2f}", True),
+             ("Total opportunity", f"${opportunity:,.2f} · {pct}%", True),
              ("Read/write ratio", f"{totals.get('read_to_write_ratio', 0)}x", False),
              ("Requests", f"{meta['unique_requests']:,}", False)]
     cards_html = "".join(
@@ -918,6 +944,10 @@ generated {gen}</p>
 <div class="cards">{cards_html}</div>
 
 <h2>What to change</h2>
+<p class="sub" style="margin:-4px 0 12px">Cache waste is <strong>measured</strong> — the exact
+difference between what a rebuild cost and what a cache read would have cost. Model savings are an
+<strong>estimate</strong>: the same token counts repriced on a cheaper model, which assumes the
+cheaper model would not iterate more.</p>
 <div class="panel"><ol class="acts">{acts_html}</ol></div>
 
 <h2>Daily spend</h2>
@@ -1006,6 +1036,7 @@ def main():
         full.setdefault("sessions", analyze_sessions(data, pricing))
         full.setdefault("models", analyze_models(data, pricing))
         full["daily"] = analyze_daily(data)
+        out["summary"] = full["summary"] = summarize(full)
         html_path = Path(os.path.expanduser(
             args.html or f"~/tokenomics-report-{datetime.now().date().isoformat()}.html"))
         try:
