@@ -1,0 +1,19 @@
+{
+  "name": "tokenomics-coach-claude-code",
+  "description": "Audit Claude Code session logs for avoidable token spend: prompt-cache expiry, un-amortized 1h cache writes, uncompacted long sessions, and model choice across planning vs execution.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Cengiz Han",
+    "url": "https://github.com/hancengiz"
+  },
+  "homepage": "https://github.com/hancengiz/tokenomics-coach-claude-code",
+  "repository": "https://github.com/hancengiz/tokenomics-coach-claude-code",
+  "license": "MIT",
+  "keywords": [
+    "tokenomics",
+    "prompt-caching",
+    "cost-analysis",
+    "claude-code",
+    "observability"
+  ]
+}
