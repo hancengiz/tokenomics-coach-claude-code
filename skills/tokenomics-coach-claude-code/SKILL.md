@@ -66,10 +66,16 @@ the planning-vs-execution split with the `opusplan` estimate.
 then attributes a cause. Idle time is only one of them — the cache can collapse with no gap at all.
 Report the three avoidable buckets in order of dollars; `compaction` is expected and not waste.
 
-**`ttl_expiry`** — idled past the TTL, then resumed a large context. The whole prefix was re-written
-at the write rate instead of read at 0.1x.
-→ Verdict: for a break longer than the TTL, `/clear` and start fresh. Resuming a 300k context after
-lunch is the single most expensive keystroke available.
+**`ttl_expiry`** — the gap between consecutive requests exceeded the TTL, so the prefix was re-written
+at the write rate instead of read at 0.1x. **Always check `subcause` before prescribing** — the gap is
+split into `human_idle_minutes` (previous response → next human prompt) and `machine_busy_minutes`:
+
+- `human_away` — the person left. → `/clear` before stepping away, then start fresh. Resuming a 300k
+  context after lunch is the single most expensive keystroke available.
+- `no_human_input` — no human prompt in the gap at all. A long tool loop, a session parked on a
+  **permission approval**, or a sleeping machine. → `/clear` does *not* help. Approve promptly and
+  stage very long unattended runs. Do not tell the user to take shorter breaks; they weren't on one.
+- `combined` — both contributed.
 
 **`model_switch`** — the model changed mid-session, invalidating the prefix.
 → Verdict: choose the model *before* the expensive context accumulates. Weigh this against the

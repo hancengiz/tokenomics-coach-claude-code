@@ -149,6 +149,7 @@ def collect(files: list[Path], days: int, pricing: dict) -> dict:
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     seen: set = set()
     requests: list[dict] = []
+    human_prompts: list[dict] = []
     compactions: list[dict] = []
     sessions_meta: dict[str, dict] = defaultdict(
         lambda: {"project": None, "compactions": 0, "plan_toggles": 0})
@@ -191,6 +192,21 @@ def collect(files: list[Path], days: int, pricing: dict) -> dict:
             msg = d.get("message")
             if not isinstance(msg, dict):
                 continue
+
+            # A real human prompt, as opposed to a tool result routed back as a
+            # 'user' entry. Tool results carry a list of tool_result blocks.
+            if d.get("type") == "user" and not d.get("isMeta"):
+                content = msg.get("content")
+                is_human = isinstance(content, str) or (
+                    isinstance(content, list) and any(
+                        isinstance(b, dict) and b.get("type") == "text"
+                        for b in content))
+                if is_human:
+                    t = parse_ts(d.get("timestamp") or "")
+                    if t and t >= cutoff:
+                        human_prompts.append({"ts": t, "session": sid})
+                continue
+
             usage = msg.get("usage")
             if not usage:
                 continue
@@ -231,7 +247,9 @@ def collect(files: list[Path], days: int, pricing: dict) -> dict:
             })
 
     requests.sort(key=lambda r: r["ts"])
-    return {"requests": requests, "compactions": compactions,
+    human_prompts.sort(key=lambda h: h["ts"])
+    return {"requests": requests, "human_prompts": human_prompts,
+            "compactions": compactions,
             "sessions_meta": dict(sessions_meta),
             "meta": {"files_scanned": len(files), "total_lines": total_lines,
                      "duplicate_entries": duplicates, "unique_requests": len(requests),
@@ -279,6 +297,14 @@ def analyze_cache(data: dict, pricing: dict) -> dict:
             if t:
                 compact_ts[c["session"]].append(t)
 
+    # Human prompt timestamps per session, to separate "the user walked away"
+    # from "a long tool loop ran". Both widen the gap; only one is a habit.
+    human: dict[str, list] = defaultdict(list)
+    for h in data["human_prompts"]:
+        human[h["session"]].append(h["ts"])
+    for v in human.values():
+        v.sort()
+
     drops = []
     unamortized = []
     ttl_modes = Counter()
@@ -315,15 +341,38 @@ def analyze_cache(data: dict, pricing: dict) -> dict:
                         # invalidated the prefix — tools, system prompt, or a resume.
                         cause = "invalidation_no_gap"
 
+                    # Split the gap: how long the human was away, versus how long
+                    # the machine was busy before this request went out.
+                    trigger = next((t for t in human.get(sid, [])
+                                    if prev["ts"] < t <= r["ts"]), None)
+                    if trigger:
+                        human_idle = (trigger - prev["ts"]).total_seconds()
+                        machine = (r["ts"] - trigger).total_seconds()
+                    else:
+                        human_idle, machine = 0.0, gap
+                    if cause == "ttl_expiry":
+                        # 'no_human_input' means no human prompt fell in the gap at
+                        # all. That covers a long tool execution, the session sitting
+                        # on a permission approval (approvals are not logged as user
+                        # messages), or the machine sleeping — indistinguishable here.
+                        subcause = ("human_away" if human_idle > ttl
+                                    else "no_human_input" if not trigger
+                                    else "combined")
+                    else:
+                        subcause = None
+
                     rt = rates_for(r["model"], pricing)
                     wr = rt["cache_write_1h"] if r["write_1h"] else rt["cache_write_5m"]
                     paid = written / 1e6 * wr
                     would_have = written / 1e6 * rt["cache_read"]
                     drops.append({
                         "cause": cause,
+                        "subcause": subcause,
                         "session": sid[:8], "project": r["project"],
                         "at": r["ts"].isoformat(),
                         "idle_minutes": round(gap / 60, 1),
+                        "human_idle_minutes": round(human_idle / 60, 1),
+                        "machine_busy_minutes": round(machine / 60, 1),
                         "ttl_minutes": ttl // 60, "ttl_source": ttl_source,
                         "sidechain": sidechain,
                         "prefix_lost_tokens": established,
@@ -592,15 +641,30 @@ def _actions(out: dict) -> list[dict]:
     sess = out.get("sessions", {})
     models = out.get("models", {})
 
+    # TTL expiry splits by who was idle — the verdicts are different.
     t = drops.get("ttl_expiry", {})
-    if t.get("avoidable_usd", 0) > 0:
-        worst = (t.get("worst") or [{}])[0]
-        acts.append({"usd": t["avoidable_usd"], "title": "Clear before long breaks",
-                     "detail": f"{t['event_count']} re-cache(s) after idling past the TTL. "
-                               f"Worst: session {worst.get('session','?')} idle "
-                               f"{worst.get('idle_minutes','?')} min on a "
-                               f"{worst.get('prefix_lost_tokens',0):,}-token prefix. "
-                               f"Use /clear before stepping away, or accept the rebuild."})
+    ev = t.get("worst") or []
+    away = [e for e in ev if e.get("subcause") == "human_away"]
+    nohuman = [e for e in ev if e.get("subcause") == "no_human_input"]
+    if away:
+        w = away[0]
+        acts.append({"usd": round(sum(e["avoidable_usd"] for e in away), 2),
+                     "title": "Clear before long breaks",
+                     "detail": f"{len(away)} re-cache(s) where you were away longer than the "
+                               f"TTL. Worst: session {w['session']} idle "
+                               f"{w['human_idle_minutes']} min on a "
+                               f"{w['prefix_lost_tokens']:,}-token prefix. Use /clear before "
+                               f"stepping away, then start fresh."})
+    if nohuman:
+        w = nohuman[0]
+        acts.append({"usd": round(sum(e["avoidable_usd"] for e in nohuman), 2),
+                     "title": "Split very long unattended runs",
+                     "detail": f"{len(nohuman)} re-cache(s) with no human prompt in the gap — "
+                               f"worst was {w['machine_busy_minutes']} min of machine time on a "
+                               f"{w['prefix_lost_tokens']:,}-token prefix. A long tool loop, a "
+                               f"session parked on a permission approval, or a sleeping machine "
+                               f"will all outrun the TTL. Approve promptly, and break multi-hour "
+                               f"unattended runs into stages. /clear will not help here."})
 
     u = cache.get("unamortized_1h_writes", {})
     if u.get("premium_paid_usd", 0) > 0:

@@ -17,7 +17,7 @@ then attributes a cause:
 
 | Cause | What happened | Avoidable? |
 |---|---|---|
-| `ttl_expiry` | Idled past the cache TTL, then resumed a large context | Yes |
+| `ttl_expiry` | The gap between requests exceeded the TTL. Sub-classified into `human_away` (you left) vs `no_human_input` (long tool loop, unanswered permission prompt, or sleeping machine) | Yes |
 | `model_switch` | Changed model mid-session, invalidating the prefix | Yes |
 | `invalidation_no_gap` | Cache died *inside* the TTL window — `CLAUDE.md` edit, MCP server connecting, tool change, or a resume | Yes |
 | `compaction` | A `/compact` boundary. Expected and usually worthwhile | No |
