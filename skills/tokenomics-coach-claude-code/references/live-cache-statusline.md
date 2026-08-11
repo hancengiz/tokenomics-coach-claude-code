@@ -171,6 +171,28 @@ than computing it inline.
   is worse than one missing a segment. Malformed JSONL lines are normal; skip them.
 - **Degrade cleanly** when there is no transcript, no assistant turn yet, or no human prompt yet.
 
+## Privacy — the status line is the most exposed line in the terminal
+
+Rule 9 applies with extra force here. A report is a file the user chooses to open; a status line is
+on screen permanently, and lands in every screenshot, screen share, pairing session, demo and
+recording — usually without anyone thinking about it.
+
+The transcript you are reading contains their prompts, their code, their chat titles and their
+directory structure. Almost none of it belongs on that line.
+
+- **Render numbers, not content.** Token counts, percentages, TTLs and durations are safe. Prompt
+  text, chat titles, file names, tool arguments and error strings are not — never surface them,
+  even truncated.
+- **Paths:** abbreviate `$HOME` to `~`. Prefer the project's basename over an absolute path; a full
+  path can name a client or an unreleased product.
+- **Never log transcript data as a debugging aid.** Writing parsed turns to `/tmp` to check your
+  work leaves prompt content on disk, outliving the session and any cleanup you meant to do. If you
+  must instrument while developing, log timestamps and counts only, and remove it when done.
+- **No network.** A status line command that phones anywhere is exfiltration on a one-second timer.
+
+If the user wants a number that cannot be computed without displaying something sensitive, say so
+and offer the aggregate instead.
+
 ## What not to do
 
 - Do not impose a layout, colour scheme, emoji set or language. Match the file already there.

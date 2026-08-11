@@ -274,6 +274,11 @@ it never includes your code or prompt text. Those titles are generated from your
 share a report, produce an anonymized copy with `--anonymize` (see
 [Sharing a report](#sharing-a-report)) rather than sending the original.
 
+The status line gets the stricter treatment, because it is permanently on screen and ends up in
+screenshots and screen shares that nobody vets first. It shows **numbers only** — token counts,
+percentages, a countdown. No prompt text, chat titles, file names or absolute paths, and no network
+calls.
+
 ## Pricing data
 
 `scripts/pricing.json` carries a `version` date. Rates change: **Sonnet 5 introductory pricing ends
