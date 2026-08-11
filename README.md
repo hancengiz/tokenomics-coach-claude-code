@@ -46,6 +46,7 @@ Ask in plain language:
 - "Why was yesterday's session so expensive?"
 - "Am I paying Opus rates to write files?"
 - "Audit my cache efficiency for the last week"
+- "Add a live cache-hit indicator to my status line"
 
 Or run it directly:
 
@@ -170,6 +171,61 @@ page carries a banner saying so. `…-legend.json` maps the placeholders back to
 The skill offers this automatically once it has reported its findings. What it cannot catch is
 something *you* named in a note that the logs never recorded — a client, an unreleased product — so
 skim the copy before sending it.
+
+## Watching it live, in your status line
+
+The report is retrospective. Ask instead for *"a cache hit indicator in my status line"* and the
+skill switches to live monitoring:
+
+```
+Cache Hit: 0.0% | ⚠ reprocessed! 100%→0% | ⏳ 60m (1h TTL)
+```
+
+**It does not install a status line.** It reads whatever you already have — your own script, a
+third-party one, or nothing — asks what you want changed, and adds the segments in that file's own
+idiom. What the skill actually carries is the arithmetic, because the obvious implementation is
+wrong in a way that hides the problem it exists to catch.
+
+### Anchor the hit rate to your prompt, not the latest turn
+
+Every tool call writes another turn, and those turns only append a small delta to an already-warm
+context, so they sit at 97–99% almost unconditionally. Read the *latest* turn and the number climbs
+while the agent works — describing the tool loop instead of your prompt.
+
+Anchor to the **first response after your last prompt**: the one turn that pays for the whole
+accumulated context. Same session, same instant:
+
+| Anchored to | Shows | What was actually true |
+|---|---|---|
+| Latest turn | 97.4% | the tool loop was warm |
+| First response after the prompt | **0.0%** | `read=0, creation=83306` — rebuilt from scratch |
+
+The latest-turn reading hid an 83k-token re-cache completely. The prompt-anchored one also holds
+still while the agent works, which is what makes it readable at a glance.
+
+The countdown uses the opposite anchor — the **most recent** turn of any kind — because a cache
+read refreshes the lifetime for free, so the tool loop genuinely keeps the context alive.
+
+### The other things that are easy to get wrong
+
+- **De-duplicate by `requestId`.** Each turn is written to the transcript several times as it
+  streams, every copy carrying the same `usage`. Sum them naively and every total silently
+  multiplies — it never errors, the numbers are just too big.
+- **Two hit-rate formulas** are both defensible — `read/(read+creation+input)` and
+  `read/(read+creation)` — and give different answers. Label which one you used.
+- **Compare like with like.** A reprocessing warning must compare two prompt-anchored turns; put a
+  tool-loop turn on either side and everything looks like a cliff.
+- **A ⚠ is not automatically waste.** After `/clear`, a compaction or a model switch it is expected
+  — the switch above was deliberate, and the rebuild is its entry fee. It is worth investigating
+  when *none* of those explain it.
+- **A countdown will not tick without `refreshInterval`.** Status lines are event-driven by
+  default, so the clock freezes between prompts. Set `"refreshInterval": 60` next to your
+  `statusLine` command and display minutes — matching the two. Going down to 1 second re-parses the
+  transcript every second in every open session, which costs real CPU for a smoother clock nobody
+  reads that closely.
+
+Full method in
+[`references/live-cache-statusline.md`](skills/tokenomics-coach-claude-code/references/live-cache-statusline.md).
 
 ## Extending it
 

@@ -1,11 +1,11 @@
 ---
 name: tokenomics-coach-claude-code
-description: "Audit Claude Code session logs for avoidable token spend — prompt-cache expiry, un-amortized cache writes, uncompacted long sessions, and model choice across planning vs execution. Use when the user asks about token cost, cache efficiency, wasted spend, why a session was expensive, whether to /clear or /compact, or which model to run for planning vs implementation."
+description: "Audit Claude Code session logs for avoidable token spend — prompt-cache expiry, un-amortized cache writes, uncompacted long sessions, and model choice across planning vs execution. Also adds live cache-hit and TTL indicators to a status line. Use when the user asks about token cost, cache efficiency, wasted spend, why a session was expensive, whether to /clear or /compact, which model to run for planning vs implementation, or wants to watch cache behaviour while they work."
 license: MIT
 compatibility: Requires Python 3.9+ and Claude Code session logs in ~/.claude/projects
-allowed-tools: Read Write Bash(python3:*) Bash(ls:*) Bash(find:*) Bash(cat:*) AskUserQuestion
+allowed-tools: Read Write Edit Bash(python3:*) Bash(ls:*) Bash(find:*) Bash(cat:*) AskUserQuestion
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   author: cengizhan
 ---
 
@@ -47,6 +47,10 @@ Scope to one project with `--project ~/code/my-app`.
 | Long threads, `/clear` vs `/compact` | `--mode sessions` | `references/session-hygiene.md` |
 | Model mix, planning vs execution | `--mode models` | `references/model-strategy.md` |
 | Full audit / "how bad is it" | `--mode all` (default) | all three |
+
+One intent does **not** run the script: *"show cache hit rate in my status line"*, *"warn me when
+my context gets reprocessed"*, *"add a cache countdown"*. That is live monitoring, not an audit —
+read `references/live-cache-statusline.md` and go straight there.
 
 Without `--pretty` the script prints a short ranked summary plus both output paths — usually all you
 need. Add `--pretty` to dump the full report JSON when you need the individual events.
@@ -133,7 +137,10 @@ summarise it, but do not contradict it.
 
 ## Rules
 
-1. **Script only.** Never `Read` a `.jsonl`. Never state a cost you did not compute.
+1. **Script only, for every cost claim.** Never `Read` a `.jsonl` to answer an audit question, and
+   never state a cost you did not compute with `analyze.py`. The single exception is the live
+   status line (`references/live-cache-statusline.md`), which necessarily parses the transcript —
+   it may report current cache state, never historical dollars.
 2. **Dollars first.** Lead every finding with its figure, and rank by it.
 3. **Never merge measured and estimated.** `summary.measured_waste_usd` is arithmetic;
    `summary.estimated_saving_usd` assumes a cheaper model would use the same tokens. Quote
@@ -142,6 +149,7 @@ summarise it, but do not contradict it.
 5. **Say what is inferred.** `invalidation_no_gap` triggers and `model_selection` savings are not
    proven. State that plainly rather than implying certainty.
 6. **Progressive disclosure.** Read only the `references/*.md` for the active mode.
+   `live-cache-statusline.md` is for the live-indicator intent only — do not load it for audits.
 7. **Don't coach prompt wording.** Out of scope. Redirect to cost impact if it comes up.
 8. **Check `pricing.json` freshness** and warn if its `version` is more than ~90 days old.
 9. **Privacy.** The report already limits itself to titles, paths and 8-char session ids. Never quote
