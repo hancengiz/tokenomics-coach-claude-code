@@ -1,0 +1,4 @@
+{
+  "name": "tokenomics-coach-claude-code",
+  "install": "[ ! -d '/agent/repos/tokenomics-coach-claude-code' ] || cd '/agent/repos/tokenomics-coach-claude-code' || exit $?\npython3 -c 'import sys; assert sys.version_info >= (3, 9), sys.version'\npython3 -m compileall -q skills/tokenomics-coach-claude-code/scripts\nnpx --yes skills-ref validate ./skills/tokenomics-coach-claude-code"
+}
